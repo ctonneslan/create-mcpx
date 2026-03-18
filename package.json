@@ -1,0 +1,49 @@
+{
+  "name": "create-mcp-server",
+  "version": "0.1.0",
+  "description": "Scaffold a new MCP server project in seconds. Pick your language, transport, and go.",
+  "type": "module",
+  "bin": {
+    "create-mcp-server": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "scaffolding",
+    "cli",
+    "generator",
+    "ai",
+    "llm",
+    "claude",
+    "create"
+  ],
+  "author": "Charlie Tonneslan",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ctonneslan/create-mcp-server.git"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.11.0",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "dist",
+    "templates"
+  ]
+}
