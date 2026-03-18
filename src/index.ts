@@ -5,13 +5,29 @@ import pc from 'picocolors';
 import { scaffold } from './scaffold.js';
 import { Options, Language, Transport } from './types.js';
 
-function parseFlags(argv: string[]): Partial<Options> & { name?: string } {
+const VALID_LANGUAGES: Language[] = ['typescript', 'python'];
+const VALID_TRANSPORTS: Transport[] = ['stdio', 'streamable-http'];
+const VALID_FEATURES = ['tests', 'docker', 'ci'];
+
+interface Flags extends Partial<Options> {
+  name?: string;
+  help?: boolean;
+  version?: boolean;
+}
+
+function parseFlags(argv: string[]): Flags {
   const result: Record<string, string> = {};
   let name: string | undefined;
+  let help = false;
+  let version = false;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg.startsWith('--') && i + 1 < argv.length) {
+    if (arg === '--help' || arg === '-h') {
+      help = true;
+    } else if (arg === '--version' || arg === '-v') {
+      version = true;
+    } else if (arg.startsWith('--') && i + 1 < argv.length) {
       result[arg.slice(2)] = argv[++i];
     } else if (!arg.startsWith('-')) {
       name = arg;
@@ -22,15 +38,75 @@ function parseFlags(argv: string[]): Partial<Options> & { name?: string } {
     name,
     language: result.language as Language | undefined,
     transport: result.transport as Transport | undefined,
-    features: result.features?.split(','),
+    features: result.features?.split(',').filter(Boolean),
+    help,
+    version,
   };
+}
+
+function validateFlags(flags: { name: string; language: Language; transport: Transport; features?: string[] }): void {
+  if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(flags.name)) {
+    console.error(`Error: Invalid name "${flags.name}". Use lowercase letters, numbers, and hyphens (no leading/trailing hyphens).`);
+    process.exit(1);
+  }
+
+  if (!VALID_LANGUAGES.includes(flags.language)) {
+    console.error(`Error: Unknown language "${flags.language}". Valid options: ${VALID_LANGUAGES.join(', ')}`);
+    process.exit(1);
+  }
+
+  if (!VALID_TRANSPORTS.includes(flags.transport)) {
+    console.error(`Error: Unknown transport "${flags.transport}". Valid options: ${VALID_TRANSPORTS.join(', ')}`);
+    process.exit(1);
+  }
+
+  if (flags.features) {
+    for (const f of flags.features) {
+      if (!VALID_FEATURES.includes(f)) {
+        console.error(`Error: Unknown feature "${f}". Valid options: ${VALID_FEATURES.join(', ')}`);
+        process.exit(1);
+      }
+    }
+  }
+}
+
+function printUsage(): void {
+  console.log(`
+Usage: create-mcp-server [name] [options]
+
+Options:
+  --language <lang>       typescript or python
+  --transport <transport> stdio or streamable-http
+  --features <list>       Comma-separated: tests,docker,ci
+  -h, --help              Show this help
+  -v, --version           Show version
+
+Examples:
+  create-mcp-server                              # Interactive mode
+  create-mcp-server my-server                    # Interactive with name pre-filled
+  create-mcp-server my-server \\
+    --language typescript \\
+    --transport stdio \\
+    --features tests,docker,ci                   # Non-interactive
+`.trim());
 }
 
 async function main() {
   const flags = parseFlags(process.argv.slice(2));
 
+  // --help / --version
+  if (flags.help) {
+    printUsage();
+    return;
+  }
+  if (flags.version) {
+    console.log('create-mcp-server 0.1.0');
+    return;
+  }
+
   // Non-interactive mode: all flags provided
   if (flags.name && flags.language && flags.transport) {
+    validateFlags(flags as { name: string; language: Language; transport: Transport });
     const config: Options = {
       name: flags.name,
       language: flags.language,

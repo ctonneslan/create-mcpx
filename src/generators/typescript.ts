@@ -29,6 +29,7 @@ export function generateTypeScript(options: Options): GeneratedFile[] {
 function packageJson(options: Options): string {
   const deps: Record<string, string> = {
     '@modelcontextprotocol/sdk': '^1.12.0',
+    zod: '^3.25.0',
   };
 
   if (options.transport === 'streamable-http') {

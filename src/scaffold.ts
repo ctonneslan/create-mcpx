@@ -25,11 +25,17 @@ export async function scaffold(options: Options): Promise<string> {
       ? generateTypeScript(options)
       : generatePython(options);
 
-  // Write all files
-  for (const file of files) {
-    const filePath = path.join(outputDir, file.path);
-    await fs.mkdir(path.dirname(filePath), { recursive: true });
-    await fs.writeFile(filePath, file.content, 'utf-8');
+  // Write all files, rolling back on failure
+  try {
+    for (const file of files) {
+      const filePath = path.join(outputDir, file.path);
+      await fs.mkdir(path.dirname(filePath), { recursive: true });
+      await fs.writeFile(filePath, file.content, 'utf-8');
+    }
+  } catch (err) {
+    // Clean up partial output
+    await fs.rm(outputDir, { recursive: true, force: true }).catch(() => {});
+    throw new Error(`Failed to write files: ${err instanceof Error ? err.message : err}`);
   }
 
   // Make entry point executable for stdio servers
@@ -41,7 +47,7 @@ export async function scaffold(options: Options): Promise<string> {
     try {
       await fs.chmod(entry, 0o755);
     } catch {
-      // Non-critical
+      // Non-critical, chmod doesn't apply on Windows
     }
   }
 

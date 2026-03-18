@@ -1,0 +1,67 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node-version: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+
+  # Verify generated TypeScript projects actually compile and pass tests
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+      # Test: TypeScript + stdio + all features
+      - name: Generate TypeScript stdio project
+        run: node dist/index.js test-ts-stdio --language typescript --transport stdio --features tests,docker,ci
+      - name: Build and test generated project
+        working-directory: test-ts-stdio
+        run: |
+          npm install
+          npm run build
+          npm test
+
+      # Test: TypeScript + streamable-http
+      - name: Generate TypeScript HTTP project
+        run: node dist/index.js test-ts-http --language typescript --transport streamable-http --features tests
+      - name: Build and test generated HTTP project
+        working-directory: test-ts-http
+        run: |
+          npm install
+          npm run build
+          npm test
+
+      # Test: Python project generates valid structure
+      - name: Generate Python stdio project
+        run: node dist/index.js test-py-stdio --language python --transport stdio --features tests,docker,ci
+      - name: Verify Python project structure
+        run: |
+          test -f test-py-stdio/pyproject.toml
+          test -f test-py-stdio/src/server.py
+          test -f test-py-stdio/src/tools.py
+          test -f test-py-stdio/tests/test_tools.py
+          test -f test-py-stdio/Dockerfile
+          test -f test-py-stdio/.github/workflows/ci.yml

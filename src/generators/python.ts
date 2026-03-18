@@ -103,29 +103,31 @@ function testFile(options: Options): string {
   return `"""Tests for ${options.name} tools."""
 
 import pytest
-from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
-from src.server import mcp
+from mcp.server.fastmcp import FastMCP
 
 
-@pytest.fixture
-async def client():
-    """Create a test client connected to the server."""
-    async with streamablehttp_client("http://localhost:3000/mcp") as (read, write, _):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            yield session
+def create_server() -> FastMCP:
+    """Create a fresh server instance for testing."""
+    from src.tools import register_tools
+
+    mcp = FastMCP("${options.name}")
+    register_tools(mcp)
+    return mcp
 
 
 class TestTools:
-    async def test_list_tools(self, client):
-        tools = await client.list_tools()
-        assert len(tools.tools) == 1
-        assert tools.tools[0].name == "hello"
+    def test_server_has_tools(self):
+        server = create_server()
+        tools = server._tool_manager.list_tools()
+        tool_names = [t.name for t in tools]
+        assert "hello" in tool_names
 
-    async def test_hello(self, client):
-        result = await client.call_tool("hello", {"name": "World"})
-        assert result.content[0].text == "Hello, World! Welcome to ${options.name}."
+    @pytest.mark.asyncio
+    async def test_hello(self):
+        server = create_server()
+        result = await server._tool_manager.call_tool("hello", {"name": "World"})
+        assert len(result) > 0
+        assert "Hello, World!" in result[0].text
 `;
 }
 
