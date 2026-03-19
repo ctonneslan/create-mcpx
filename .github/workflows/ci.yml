@@ -17,8 +17,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: npm
-      - run: npm ci
+      - run: npm install
       - run: npm run build
       - run: npm test
 
@@ -30,11 +29,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
       - uses: actions/setup-go@v5
         with:
           go-version: "1.23"
-      - run: npm ci
+      - run: npm install
       - run: npm run build
 
       # Test: TypeScript + stdio + all features + client configs
