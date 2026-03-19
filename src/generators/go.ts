@@ -287,7 +287,7 @@ ${config.snippet}
 
   return `# ${options.name}
 
-An MCP server built with [create-mcpx](https://github.com/ctonneslan/create-mcp-server) and [mcp-go](https://github.com/mark3labs/mcp-go).
+An MCP server built with [create-mcpx](https://github.com/ctonneslan/create-mcpx) and [mcp-go](https://github.com/mark3labs/mcp-go).
 
 ## Setup
 

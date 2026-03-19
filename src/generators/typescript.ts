@@ -303,7 +303,7 @@ ${config.snippet}
 
   return `# ${options.name}
 
-An MCP server built with [create-mcpx](https://github.com/ctonneslan/create-mcp-server).
+An MCP server built with [create-mcpx](https://github.com/ctonneslan/create-mcpx).
 
 ## Setup
 

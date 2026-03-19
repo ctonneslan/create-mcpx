@@ -1,12 +1,12 @@
-# Contributing to create-mcp-server
+# Contributing to create-mcpx
 
 Thanks for your interest in contributing! Here's how to get started.
 
 ## Development Setup
 
 ```bash
-git clone https://github.com/ctonneslan/create-mcp-server.git
-cd create-mcp-server
+git clone https://github.com/ctonneslan/create-mcpx.git
+cd create-mcpx
 npm install
 npm run build
 ```

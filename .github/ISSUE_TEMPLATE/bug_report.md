@@ -16,11 +16,11 @@ labels: bug
 
 ```bash
 # The command you ran
-npx create-mcp-server ...
+npx create-mcpx ...
 ```
 
 ## Environment
 
 - Node.js version:
 - OS:
-- create-mcp-server version:
+- create-mcpx version:

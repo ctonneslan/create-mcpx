@@ -32,11 +32,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ctonneslan/create-mcp-server.git"
+    "url": "git+https://github.com/ctonneslan/create-mcpx.git"
   },
-  "homepage": "https://github.com/ctonneslan/create-mcp-server#readme",
+  "homepage": "https://github.com/ctonneslan/create-mcpx#readme",
   "bugs": {
-    "url": "https://github.com/ctonneslan/create-mcp-server/issues"
+    "url": "https://github.com/ctonneslan/create-mcpx/issues"
   },
   "dependencies": {
     "@clack/prompts": "^0.11.0",
