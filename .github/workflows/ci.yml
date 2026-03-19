@@ -34,9 +34,9 @@ jobs:
       - run: npm ci
       - run: npm run build
 
-      # Test: TypeScript + stdio + all features
+      # Test: TypeScript + stdio + all features + client configs
       - name: Generate TypeScript stdio project
-        run: node dist/index.js test-ts-stdio --language typescript --transport stdio --features tests,docker,ci
+        run: node dist/index.js test-ts-stdio --language typescript --clients claude-desktop,cursor,vscode --features tests,docker,ci
       - name: Build and test generated project
         working-directory: test-ts-stdio
         run: |

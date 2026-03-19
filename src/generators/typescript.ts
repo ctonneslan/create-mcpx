@@ -1,5 +1,6 @@
 import { Options } from '../types.js';
 import { GeneratedFile } from '../scaffold.js';
+import { generateClientConfigs } from '../clients.js';
 
 export function generateTypeScript(options: Options): GeneratedFile[] {
   const files: GeneratedFile[] = [];
@@ -265,23 +266,14 @@ jobs:
 }
 
 function readme(options: Options): string {
-  const installCmd =
-    options.transport === 'stdio'
-      ? `## Usage with Claude Desktop
+  const configs = generateClientConfigs(options.name, options.language, options.transport);
+  const selectedConfigs = options.clients.length > 0
+    ? configs.filter((c) => options.clients.includes(c.client))
+    : configs;
 
-Add to your Claude Desktop config (\`claude_desktop_config.json\`):
-
-\`\`\`json
-{
-  "mcpServers": {
-    "${options.name}": {
-      "command": "node",
-      "args": ["${options.name}/dist/index.js"]
-    }
-  }
-}
-\`\`\``
-      : `## Usage
+  let clientSections = '';
+  if (options.transport === 'streamable-http') {
+    clientSections = `## Usage
 
 Start the server:
 
@@ -289,7 +281,25 @@ Start the server:
 npm start
 \`\`\`
 
-The server will be available at \`http://localhost:3000/mcp\`.`;
+The server will be available at \`http://localhost:3000/mcp\`.
+
+`;
+  }
+
+  if (selectedConfigs.length > 0) {
+    clientSections += `## Client Configuration\n\n`;
+    for (const config of selectedConfigs) {
+      clientSections += `### ${config.label}
+
+Add to \`${config.configPath}\`:
+
+\`\`\`json
+${config.snippet}
+\`\`\`
+
+`;
+    }
+  }
 
   return `# ${options.name}
 
@@ -302,9 +312,7 @@ npm install
 npm run build
 \`\`\`
 
-${installCmd}
-
-## Tools
+${clientSections}## Tools
 
 | Tool | Description |
 |------|-------------|

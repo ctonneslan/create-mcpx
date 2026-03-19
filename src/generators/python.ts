@@ -1,5 +1,6 @@
 import { Options } from '../types.js';
 import { GeneratedFile } from '../scaffold.js';
+import { generateClientConfigs } from '../clients.js';
 
 export function generatePython(options: Options): GeneratedFile[] {
   const files: GeneratedFile[] = [];
@@ -173,30 +174,38 @@ jobs:
 }
 
 function readme(options: Options): string {
-  const usage =
-    options.transport === 'stdio'
-      ? `## Usage with Claude Desktop
+  const configs = generateClientConfigs(options.name, options.language, options.transport);
+  const selectedConfigs = options.clients.length > 0
+    ? configs.filter((c) => options.clients.includes(c.client))
+    : configs;
 
-Add to your Claude Desktop config:
-
-\`\`\`json
-{
-  "mcpServers": {
-    "${options.name}": {
-      "command": "python",
-      "args": ["-m", "src.server"],
-      "cwd": "/path/to/${options.name}"
-    }
-  }
-}
-\`\`\``
-      : `## Usage
+  let clientSections = '';
+  if (options.transport === 'streamable-http') {
+    clientSections = `## Usage
 
 \`\`\`bash
 python -m src.server
 \`\`\`
 
-The server will be available at \`http://localhost:3000/mcp\`.`;
+The server will be available at \`http://localhost:3000/mcp\`.
+
+`;
+  }
+
+  if (selectedConfigs.length > 0) {
+    clientSections += `## Client Configuration\n\n`;
+    for (const config of selectedConfigs) {
+      clientSections += `### ${config.label}
+
+Add to \`${config.configPath}\`:
+
+\`\`\`json
+${config.snippet}
+\`\`\`
+
+`;
+    }
+  }
 
   return `# ${options.name}
 
@@ -208,9 +217,7 @@ An MCP server built with [create-mcp-server](https://github.com/ctonneslan/creat
 pip install -e ".[dev]"
 \`\`\`
 
-${usage}
-
-## Tools
+${clientSections}## Tools
 
 | Tool | Description |
 |------|-------------|

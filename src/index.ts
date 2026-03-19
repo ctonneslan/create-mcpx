@@ -3,10 +3,12 @@
 import * as p from '@clack/prompts';
 import pc from 'picocolors';
 import { scaffold } from './scaffold.js';
-import { Options, Language, Transport } from './types.js';
+import { Options, Language, Transport, Client } from './types.js';
+import { inferTransport } from './clients.js';
 
 const VALID_LANGUAGES: Language[] = ['typescript', 'python'];
 const VALID_TRANSPORTS: Transport[] = ['stdio', 'streamable-http'];
+const VALID_CLIENTS: Client[] = ['claude-desktop', 'cursor', 'vscode', 'windsurf'];
 const VALID_FEATURES = ['tests', 'docker', 'ci'];
 
 interface Flags extends Partial<Options> {
@@ -38,32 +40,58 @@ function parseFlags(argv: string[]): Flags {
     name,
     language: result.language as Language | undefined,
     transport: result.transport as Transport | undefined,
+    clients: result.clients?.split(',').filter(Boolean) as Client[] | undefined,
     features: result.features?.split(',').filter(Boolean),
     help,
     version,
   };
 }
 
-function validateFlags(flags: { name: string; language: Language; transport: Transport; features?: string[] }): void {
+function validateFlags(flags: {
+  name: string;
+  language: Language;
+  transport?: Transport;
+  clients?: Client[];
+  features?: string[];
+}): void {
   if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(flags.name)) {
-    console.error(`Error: Invalid name "${flags.name}". Use lowercase letters, numbers, and hyphens (no leading/trailing hyphens).`);
+    console.error(
+      `Error: Invalid name "${flags.name}". Use lowercase letters, numbers, and hyphens (no leading/trailing hyphens).`,
+    );
     process.exit(1);
   }
 
   if (!VALID_LANGUAGES.includes(flags.language)) {
-    console.error(`Error: Unknown language "${flags.language}". Valid options: ${VALID_LANGUAGES.join(', ')}`);
+    console.error(
+      `Error: Unknown language "${flags.language}". Valid options: ${VALID_LANGUAGES.join(', ')}`,
+    );
     process.exit(1);
   }
 
-  if (!VALID_TRANSPORTS.includes(flags.transport)) {
-    console.error(`Error: Unknown transport "${flags.transport}". Valid options: ${VALID_TRANSPORTS.join(', ')}`);
+  if (flags.transport && !VALID_TRANSPORTS.includes(flags.transport)) {
+    console.error(
+      `Error: Unknown transport "${flags.transport}". Valid options: ${VALID_TRANSPORTS.join(', ')}`,
+    );
     process.exit(1);
+  }
+
+  if (flags.clients) {
+    for (const c of flags.clients) {
+      if (!VALID_CLIENTS.includes(c)) {
+        console.error(
+          `Error: Unknown client "${c}". Valid options: ${VALID_CLIENTS.join(', ')}`,
+        );
+        process.exit(1);
+      }
+    }
   }
 
   if (flags.features) {
     for (const f of flags.features) {
       if (!VALID_FEATURES.includes(f)) {
-        console.error(`Error: Unknown feature "${f}". Valid options: ${VALID_FEATURES.join(', ')}`);
+        console.error(
+          `Error: Unknown feature "${f}". Valid options: ${VALID_FEATURES.join(', ')}`,
+        );
         process.exit(1);
       }
     }
@@ -71,30 +99,34 @@ function validateFlags(flags: { name: string; language: Language; transport: Tra
 }
 
 function printUsage(): void {
-  console.log(`
+  console.log(
+    `
 Usage: create-mcp-server [name] [options]
 
 Options:
   --language <lang>       typescript or python
-  --transport <transport> stdio or streamable-http
+  --clients <list>        Comma-separated: claude-desktop,cursor,vscode,windsurf
+  --transport <transport> stdio or streamable-http (auto-detected from clients if omitted)
   --features <list>       Comma-separated: tests,docker,ci
   -h, --help              Show this help
   -v, --version           Show version
 
 Examples:
   create-mcp-server                              # Interactive mode
-  create-mcp-server my-server                    # Interactive with name pre-filled
   create-mcp-server my-server \\
     --language typescript \\
-    --transport stdio \\
-    --features tests,docker,ci                   # Non-interactive
-`.trim());
+    --clients claude-desktop,cursor              # Auto-selects stdio transport
+  create-mcp-server my-server \\
+    --language python \\
+    --transport streamable-http \\
+    --features tests,docker,ci                   # Full non-interactive
+`.trim(),
+  );
 }
 
 async function main() {
   const flags = parseFlags(process.argv.slice(2));
 
-  // --help / --version
   if (flags.help) {
     printUsage();
     return;
@@ -104,13 +136,18 @@ async function main() {
     return;
   }
 
-  // Non-interactive mode: all flags provided
-  if (flags.name && flags.language && flags.transport) {
-    validateFlags(flags as { name: string; language: Language; transport: Transport });
+  // Non-interactive mode: name + language required, transport can be inferred
+  if (flags.name && flags.language) {
+    validateFlags(flags as { name: string; language: Language });
+
+    const clients = flags.clients ?? [];
+    const transport = flags.transport ?? inferTransport(clients) ?? 'stdio';
+
     const config: Options = {
       name: flags.name,
       language: flags.language,
-      transport: flags.transport,
+      transport,
+      clients,
       features: flags.features ?? [],
     };
     const outputDir = await scaffold(config);
@@ -118,6 +155,7 @@ async function main() {
     return;
   }
 
+  // Interactive mode
   p.intro(pc.bgCyan(pc.black(' create-mcp-server ')));
 
   const projectName = flags.name;
@@ -146,14 +184,37 @@ async function main() {
           ],
         }),
 
-      transport: () =>
-        p.select({
+      clients: () =>
+        p.multiselect({
+          message: 'Which clients will connect to this server?',
+          options: [
+            { value: 'claude-desktop', label: 'Claude Desktop' },
+            { value: 'cursor', label: 'Cursor' },
+            { value: 'vscode', label: 'VS Code (Copilot)' },
+            { value: 'windsurf', label: 'Windsurf' },
+          ],
+          required: false,
+        }),
+
+      transport: ({ results }) => {
+        const clients = (results.clients as Client[]) ?? [];
+        const inferred = inferTransport(clients);
+
+        if (inferred && clients.length > 0) {
+          p.log.info(
+            `Transport auto-selected: ${pc.bold(inferred)} (based on your client choices)`,
+          );
+          return Promise.resolve(inferred);
+        }
+
+        return p.select({
           message: 'Which transport?',
           options: [
-            { value: 'stdio', label: 'stdio', hint: 'for CLI tools like Claude Desktop' },
-            { value: 'streamable-http', label: 'Streamable HTTP', hint: 'for web deployments' },
+            { value: 'stdio', label: 'stdio', hint: 'for local clients (Claude Desktop, Cursor, etc.)' },
+            { value: 'streamable-http', label: 'Streamable HTTP', hint: 'for remote/web deployments' },
           ],
-        }),
+        });
+      },
 
       features: () =>
         p.multiselect({
@@ -178,6 +239,7 @@ async function main() {
     name: options.name as string,
     language: options.language as Language,
     transport: options.transport as Transport,
+    clients: (options.clients as Client[]) ?? [],
     features: (options.features as string[]) ?? [],
   };
 

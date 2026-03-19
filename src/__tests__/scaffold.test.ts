@@ -19,19 +19,27 @@ afterEach(async () => {
   await fs.rm(tmpDir, { recursive: true, force: true });
 });
 
+/** Helper to create Options with defaults. */
+function opts(overrides: Partial<Options> & Pick<Options, 'name'>): Options {
+  return {
+    language: 'typescript',
+    transport: 'stdio',
+    clients: [],
+    features: [],
+    ...overrides,
+  };
+}
+
 describe('scaffold', () => {
   describe('typescript + stdio', () => {
-    const opts: Options = {
+    const o = opts({
       name: 'my-server',
-      language: 'typescript',
-      transport: 'stdio',
       features: ['tests', 'docker', 'ci'],
-    };
+    });
 
     it('creates expected files', async () => {
-      await scaffold(opts);
-      const dir = path.join(tmpDir, 'my-server');
-      const files = await listFiles(dir);
+      await scaffold(o);
+      const files = await listFiles(path.join(tmpDir, 'my-server'));
 
       expect(files).toContain('package.json');
       expect(files).toContain('tsconfig.json');
@@ -45,7 +53,7 @@ describe('scaffold', () => {
     });
 
     it('generates valid package.json', async () => {
-      await scaffold(opts);
+      await scaffold(o);
       const pkg = JSON.parse(
         await fs.readFile(path.join(tmpDir, 'my-server', 'package.json'), 'utf-8'),
       );
@@ -56,7 +64,7 @@ describe('scaffold', () => {
     });
 
     it('includes zod in dependencies', async () => {
-      await scaffold(opts);
+      await scaffold(o);
       const pkg = JSON.parse(
         await fs.readFile(path.join(tmpDir, 'my-server', 'package.json'), 'utf-8'),
       );
@@ -65,7 +73,7 @@ describe('scaffold', () => {
     });
 
     it('uses stdio transport in entry point', async () => {
-      await scaffold(opts);
+      await scaffold(o);
       const entry = await fs.readFile(
         path.join(tmpDir, 'my-server', 'src', 'index.ts'),
         'utf-8',
@@ -76,7 +84,7 @@ describe('scaffold', () => {
     });
 
     it('includes shebang for stdio entry point', async () => {
-      await scaffold(opts);
+      await scaffold(o);
       const entry = await fs.readFile(
         path.join(tmpDir, 'my-server', 'src', 'index.ts'),
         'utf-8',
@@ -86,7 +94,7 @@ describe('scaffold', () => {
     });
 
     it('generates valid Dockerfile', async () => {
-      await scaffold(opts);
+      await scaffold(o);
       const dockerfile = await fs.readFile(
         path.join(tmpDir, 'my-server', 'Dockerfile'),
         'utf-8',
@@ -99,7 +107,7 @@ describe('scaffold', () => {
     });
 
     it('generates valid CI workflow', async () => {
-      await scaffold(opts);
+      await scaffold(o);
       const ci = await fs.readFile(
         path.join(tmpDir, 'my-server', '.github', 'workflows', 'ci.yml'),
         'utf-8',
@@ -111,7 +119,7 @@ describe('scaffold', () => {
     });
 
     it('embeds server name in tool output', async () => {
-      await scaffold(opts);
+      await scaffold(o);
       const tools = await fs.readFile(
         path.join(tmpDir, 'my-server', 'src', 'tools.ts'),
         'utf-8',
@@ -121,7 +129,7 @@ describe('scaffold', () => {
     });
 
     it('generates test file with InMemoryTransport', async () => {
-      await scaffold(opts);
+      await scaffold(o);
       const test = await fs.readFile(
         path.join(tmpDir, 'my-server', 'src', '__tests__', 'tools.test.ts'),
         'utf-8',
@@ -133,15 +141,13 @@ describe('scaffold', () => {
   });
 
   describe('typescript + streamable-http', () => {
-    const opts: Options = {
+    const o = opts({
       name: 'http-server',
-      language: 'typescript',
       transport: 'streamable-http',
-      features: [],
-    };
+    });
 
     it('uses express and StreamableHTTPServerTransport', async () => {
-      await scaffold(opts);
+      await scaffold(o);
       const entry = await fs.readFile(
         path.join(tmpDir, 'http-server', 'src', 'index.ts'),
         'utf-8',
@@ -153,7 +159,7 @@ describe('scaffold', () => {
     });
 
     it('includes express in dependencies', async () => {
-      await scaffold(opts);
+      await scaffold(o);
       const pkg = JSON.parse(
         await fs.readFile(path.join(tmpDir, 'http-server', 'package.json'), 'utf-8'),
       );
@@ -163,28 +169,27 @@ describe('scaffold', () => {
     });
 
     it('omits test files when tests not selected', async () => {
-      await scaffold(opts);
+      await scaffold(o);
       const files = await listFiles(path.join(tmpDir, 'http-server'));
       expect(files).not.toContain('src/__tests__/tools.test.ts');
     });
 
     it('omits Dockerfile when docker not selected', async () => {
-      await scaffold(opts);
+      await scaffold(o);
       const files = await listFiles(path.join(tmpDir, 'http-server'));
       expect(files).not.toContain('Dockerfile');
     });
 
     it('omits CI when ci not selected', async () => {
-      await scaffold(opts);
+      await scaffold(o);
       const files = await listFiles(path.join(tmpDir, 'http-server'));
       expect(files).not.toContain('.github/workflows/ci.yml');
     });
 
     it('exposes port 3000 in Dockerfile for HTTP transport', async () => {
-      const httpWithDocker: Options = { ...opts, features: ['docker'] };
-      await scaffold(httpWithDocker);
+      await scaffold(opts({ name: 'http-server-docker', transport: 'streamable-http', features: ['docker'] }));
       const dockerfile = await fs.readFile(
-        path.join(tmpDir, 'http-server', 'Dockerfile'),
+        path.join(tmpDir, 'http-server-docker', 'Dockerfile'),
         'utf-8',
       );
 
@@ -193,15 +198,10 @@ describe('scaffold', () => {
   });
 
   describe('typescript minimal (no features)', () => {
-    const opts: Options = {
-      name: 'minimal',
-      language: 'typescript',
-      transport: 'stdio',
-      features: [],
-    };
+    const o = opts({ name: 'minimal' });
 
     it('creates only core files', async () => {
-      await scaffold(opts);
+      await scaffold(o);
       const files = await listFiles(path.join(tmpDir, 'minimal'));
 
       expect(files).toContain('package.json');
@@ -217,7 +217,7 @@ describe('scaffold', () => {
     });
 
     it('does not include test script without tests feature', async () => {
-      await scaffold(opts);
+      await scaffold(o);
       const pkg = JSON.parse(
         await fs.readFile(path.join(tmpDir, 'minimal', 'package.json'), 'utf-8'),
       );
@@ -228,15 +228,14 @@ describe('scaffold', () => {
   });
 
   describe('python + stdio', () => {
-    const opts: Options = {
+    const o = opts({
       name: 'py-server',
       language: 'python',
-      transport: 'stdio',
       features: ['tests'],
-    };
+    });
 
     it('creates expected files', async () => {
-      await scaffold(opts);
+      await scaffold(o);
       const files = await listFiles(path.join(tmpDir, 'py-server'));
 
       expect(files).toContain('pyproject.toml');
@@ -248,7 +247,7 @@ describe('scaffold', () => {
     });
 
     it('uses stdio transport', async () => {
-      await scaffold(opts);
+      await scaffold(o);
       const server = await fs.readFile(
         path.join(tmpDir, 'py-server', 'src', 'server.py'),
         'utf-8',
@@ -258,7 +257,7 @@ describe('scaffold', () => {
     });
 
     it('generates valid pyproject.toml', async () => {
-      await scaffold(opts);
+      await scaffold(o);
       const toml = await fs.readFile(
         path.join(tmpDir, 'py-server', 'pyproject.toml'),
         'utf-8',
@@ -271,7 +270,7 @@ describe('scaffold', () => {
     });
 
     it('uses FastMCP in server template', async () => {
-      await scaffold(opts);
+      await scaffold(o);
       const server = await fs.readFile(
         path.join(tmpDir, 'py-server', 'src', 'server.py'),
         'utf-8',
@@ -282,15 +281,14 @@ describe('scaffold', () => {
   });
 
   describe('python + streamable-http', () => {
-    const opts: Options = {
+    const o = opts({
       name: 'py-http',
       language: 'python',
       transport: 'streamable-http',
-      features: [],
-    };
+    });
 
     it('uses streamable-http transport', async () => {
-      await scaffold(opts);
+      await scaffold(o);
       const server = await fs.readFile(
         path.join(tmpDir, 'py-http', 'src', 'server.py'),
         'utf-8',
@@ -301,7 +299,7 @@ describe('scaffold', () => {
     });
 
     it('includes uvicorn in dependencies', async () => {
-      await scaffold(opts);
+      await scaffold(o);
       const toml = await fs.readFile(
         path.join(tmpDir, 'py-http', 'pyproject.toml'),
         'utf-8',
@@ -311,7 +309,7 @@ describe('scaffold', () => {
     });
 
     it('omits test files without tests feature', async () => {
-      await scaffold(opts);
+      await scaffold(o);
       const files = await listFiles(path.join(tmpDir, 'py-http'));
 
       expect(files).not.toContain('tests/test_tools.py');
@@ -321,12 +319,12 @@ describe('scaffold', () => {
 
   describe('python + docker', () => {
     it('exposes port for HTTP transport', async () => {
-      await scaffold({
+      await scaffold(opts({
         name: 'py-docker-http',
         language: 'python',
         transport: 'streamable-http',
         features: ['docker'],
-      });
+      }));
       const dockerfile = await fs.readFile(
         path.join(tmpDir, 'py-docker-http', 'Dockerfile'),
         'utf-8',
@@ -337,12 +335,11 @@ describe('scaffold', () => {
     });
 
     it('does not expose port for stdio transport', async () => {
-      await scaffold({
+      await scaffold(opts({
         name: 'py-docker-stdio',
         language: 'python',
-        transport: 'stdio',
         features: ['docker'],
-      });
+      }));
       const dockerfile = await fs.readFile(
         path.join(tmpDir, 'py-docker-stdio', 'Dockerfile'),
         'utf-8',
@@ -354,7 +351,7 @@ describe('scaffold', () => {
 
   describe('server name embedding', () => {
     it('embeds name in TypeScript server config', async () => {
-      await scaffold({ name: 'cool-server', language: 'typescript', transport: 'stdio', features: [] });
+      await scaffold(opts({ name: 'cool-server' }));
       const entry = await fs.readFile(
         path.join(tmpDir, 'cool-server', 'src', 'index.ts'),
         'utf-8',
@@ -364,7 +361,7 @@ describe('scaffold', () => {
     });
 
     it('embeds name in Python server config', async () => {
-      await scaffold({ name: 'cool-server', language: 'python', transport: 'stdio', features: [] });
+      await scaffold(opts({ name: 'cool-server', language: 'python' }));
       const server = await fs.readFile(
         path.join(tmpDir, 'cool-server', 'src', 'server.py'),
         'utf-8',
@@ -374,24 +371,99 @@ describe('scaffold', () => {
     });
   });
 
-  describe('README generation', () => {
-    it('includes Claude Desktop config for stdio TypeScript', async () => {
-      await scaffold({ name: 'ts-stdio', language: 'typescript', transport: 'stdio', features: [] });
-      const readme = await fs.readFile(path.join(tmpDir, 'ts-stdio', 'README.md'), 'utf-8');
+  describe('client config in README', () => {
+    it('includes all client configs when no clients specified (stdio)', async () => {
+      await scaffold(opts({ name: 'all-clients' }));
+      const readme = await fs.readFile(path.join(tmpDir, 'all-clients', 'README.md'), 'utf-8');
 
-      expect(readme).toContain('claude_desktop_config.json');
-      expect(readme).toContain('ts-stdio');
+      expect(readme).toContain('Claude Desktop');
+      expect(readme).toContain('Cursor');
+      expect(readme).toContain('VS Code');
+      expect(readme).toContain('Windsurf');
     });
 
+    it('includes only selected client configs', async () => {
+      await scaffold(opts({
+        name: 'cursor-only',
+        clients: ['cursor'],
+      }));
+      const readme = await fs.readFile(path.join(tmpDir, 'cursor-only', 'README.md'), 'utf-8');
+
+      expect(readme).toContain('Cursor');
+      expect(readme).toContain('.cursor/mcp.json');
+      expect(readme).not.toContain('### Claude Desktop');
+      expect(readme).not.toContain('### VS Code');
+      expect(readme).not.toContain('### Windsurf');
+    });
+
+    it('uses correct VS Code config format', async () => {
+      await scaffold(opts({
+        name: 'vscode-server',
+        clients: ['vscode'],
+      }));
+      const readme = await fs.readFile(path.join(tmpDir, 'vscode-server', 'README.md'), 'utf-8');
+
+      expect(readme).toContain('mcp.servers');
+      expect(readme).toContain('.vscode/settings.json');
+    });
+
+    it('uses URL-based config for HTTP transport', async () => {
+      await scaffold(opts({
+        name: 'http-cfg',
+        transport: 'streamable-http',
+        clients: ['claude-desktop'],
+      }));
+      const readme = await fs.readFile(path.join(tmpDir, 'http-cfg', 'README.md'), 'utf-8');
+
+      expect(readme).toContain('http://localhost:3000/mcp');
+    });
+
+    it('uses command-based config for stdio transport', async () => {
+      await scaffold(opts({
+        name: 'stdio-cfg',
+        clients: ['claude-desktop'],
+      }));
+      const readme = await fs.readFile(path.join(tmpDir, 'stdio-cfg', 'README.md'), 'utf-8');
+
+      expect(readme).toContain('"command"');
+      expect(readme).toContain('"node"');
+    });
+
+    it('uses python command for Python stdio projects', async () => {
+      await scaffold(opts({
+        name: 'py-cfg',
+        language: 'python',
+        clients: ['claude-desktop'],
+      }));
+      const readme = await fs.readFile(path.join(tmpDir, 'py-cfg', 'README.md'), 'utf-8');
+
+      expect(readme).toContain('"python"');
+      expect(readme).toContain('src.server');
+    });
+
+    it('includes multiple selected clients', async () => {
+      await scaffold(opts({
+        name: 'multi-client',
+        clients: ['claude-desktop', 'cursor'],
+      }));
+      const readme = await fs.readFile(path.join(tmpDir, 'multi-client', 'README.md'), 'utf-8');
+
+      expect(readme).toContain('### Claude Desktop');
+      expect(readme).toContain('### Cursor');
+      expect(readme).not.toContain('### VS Code');
+    });
+  });
+
+  describe('README generation', () => {
     it('includes localhost URL for HTTP TypeScript', async () => {
-      await scaffold({ name: 'ts-http', language: 'typescript', transport: 'streamable-http', features: [] });
+      await scaffold(opts({ name: 'ts-http', transport: 'streamable-http' }));
       const readme = await fs.readFile(path.join(tmpDir, 'ts-http', 'README.md'), 'utf-8');
 
       expect(readme).toContain('http://localhost:3000/mcp');
     });
 
     it('includes test command when tests enabled', async () => {
-      await scaffold({ name: 'with-tests', language: 'typescript', transport: 'stdio', features: ['tests'] });
+      await scaffold(opts({ name: 'with-tests', features: ['tests'] }));
       const readme = await fs.readFile(path.join(tmpDir, 'with-tests', 'README.md'), 'utf-8');
 
       expect(readme).toContain('npm test');
@@ -401,18 +473,11 @@ describe('scaffold', () => {
   describe('error handling', () => {
     it('throws if directory already exists', async () => {
       await fs.mkdir(path.join(tmpDir, 'existing'));
-      await expect(
-        scaffold({ name: 'existing', language: 'typescript', transport: 'stdio', features: [] }),
-      ).rejects.toThrow('already exists');
+      await expect(scaffold(opts({ name: 'existing' }))).rejects.toThrow('already exists');
     });
 
     it('returns absolute path to output directory', async () => {
-      const result = await scaffold({
-        name: 'abs-path-test',
-        language: 'typescript',
-        transport: 'stdio',
-        features: [],
-      });
+      const result = await scaffold(opts({ name: 'abs-path-test' }));
 
       expect(path.isAbsolute(result)).toBe(true);
       expect(result).toContain('abs-path-test');
