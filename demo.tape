@@ -7,31 +7,32 @@ Set Height 500
 Set Padding 16
 Set Theme "Catppuccin Mocha"
 Set TypingSpeed 35ms
+Set CursorBlink false
+Set WindowBar Colorful
+Set WindowBarSize 40
+
+Type `cd /tmp && rm -rf demo-run && mkdir demo-run && cd demo-run && clear`
+Enter
+Sleep 500ms
 
 Type "# Scaffold an MCP server in seconds"
 Enter
 Sleep 800ms
 
-Type "npx create-mcpx my-weather-server \"
-Enter
-Type "  --language typescript \"
-Enter
-Type "  --clients claude-desktop,cursor \"
-Enter
-Type "  --features tests,docker"
+Type@50ms "create-mcpx my-server --language typescript --clients claude-desktop,cursor --features tests,docker"
 Sleep 400ms
 Enter
-Sleep 6s
+Sleep 4s
 
-Type "ls my-weather-server/"
+Type "ls my-server/"
 Enter
 Sleep 1.5s
 
-Type "head -30 my-weather-server/README.md"
+Type "head -30 my-server/README.md"
 Enter
-Sleep 3s
+Sleep 4s
 
-Type "cd my-weather-server && npm install -s && npm test"
+Type "cd my-server && npm install --silent && npm test"
 Sleep 400ms
 Enter
 Sleep 15s
