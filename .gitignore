@@ -3,3 +3,5 @@ dist/
 *.tsbuildinfo
 .env
 package-lock.json
+my-weather-server/
+promo-drafts.md
