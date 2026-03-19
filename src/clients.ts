@@ -27,11 +27,14 @@ export function generateClientConfigs(
   language: Language,
   transport: Transport,
 ): ClientConfig[] {
-  const command = language === 'typescript' ? 'node' : 'python';
+  const command =
+    language === 'typescript' ? 'node' : language === 'go' ? 'go' : 'python';
   const args =
     language === 'typescript'
       ? `["dist/index.js"]`
-      : `["-m", "src.server"]`;
+      : language === 'go'
+        ? `["run", "."]`
+        : `["-m", "src.server"]`;
 
   if (transport === 'streamable-http') {
     return [

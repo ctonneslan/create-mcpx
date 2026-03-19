@@ -1,28 +1,28 @@
-# create-mcp-server
+# create-mcpx
 
 Scaffold a new [MCP](https://modelcontextprotocol.io) server project in seconds.
 
 ```bash
-npx create-mcp-server
+npx create-mcpx
 ```
 
 Pick your language, target clients, and optional extras. Get a working MCP server with client config snippets, tests, Docker, and CI ready to go.
 
 ## Why
 
-Every MCP server starts the same way: copy an example, rip out the parts you don't need, wire up the transport, figure out the config format for Claude Desktop vs Cursor vs VS Code, add a build step. `create-mcp-server` does all of that in one command so you can skip straight to writing tools.
+Every MCP server starts the same way: copy an example, rip out the parts you don't need, wire up the transport, figure out the config format for Claude Desktop vs Cursor vs VS Code, add a build step. `create-mcpx` does all of that in one command so you can skip straight to writing tools.
 
 ## Quick Start
 
 ### Interactive
 
 ```bash
-npx create-mcp-server
+npx create-mcpx
 ```
 
 You'll be prompted for:
 - **Server name** — lowercase, hyphens ok
-- **Language** — TypeScript (recommended) or Python
+- **Language** — TypeScript (recommended), Python, or Go
 - **Target clients** — Claude Desktop, Cursor, VS Code, Windsurf (auto-selects the right transport)
 - **Extras** — Tests, Dockerfile, GitHub Actions CI
 
@@ -30,16 +30,19 @@ You'll be prompted for:
 
 ```bash
 # Auto-detects stdio transport from client selection
-npx create-mcp-server my-server \
+npx create-mcpx my-server \
   --language typescript \
   --clients claude-desktop,cursor \
   --features tests,docker,ci
 
-# Or specify transport directly
-npx create-mcp-server my-server \
-  --language python \
-  --transport streamable-http \
-  --features tests,docker
+# Go server with auto-install
+npx create-mcpx my-server \
+  --language go --clients claude-desktop \
+  --features tests,docker --install
+
+# Preview without writing
+npx create-mcpx my-server \
+  --language python --dry-run
 ```
 
 ### Then
@@ -55,7 +58,7 @@ The generated README includes ready-to-paste config snippets for each client you
 
 ## Client Config Snippets
 
-The hardest part of MCP server development is getting the client config right. Every client has a different format and file location. `create-mcp-server` generates the exact JSON you need for each client:
+The hardest part of MCP server development is getting the client config right. Every client has a different format and file location. `create-mcpx` generates the exact JSON you need for each client:
 
 | Client | Config Location | Format |
 |--------|----------------|--------|
@@ -68,7 +71,7 @@ Select your target clients during setup and the generated README will include co
 
 ## Smart Transport Detection
 
-Don't know whether to use stdio or Streamable HTTP? Just tell `create-mcp-server` which clients you're targeting and it picks the right transport automatically:
+Don't know whether to use stdio or Streamable HTTP? Just tell `create-mcpx` which clients you're targeting and it picks the right transport automatically:
 
 - **Claude Desktop, Cursor, VS Code, Windsurf** → stdio
 - **Remote/web deployment** → Streamable HTTP
@@ -95,6 +98,19 @@ my-server/
 
 Same structure, but `index.ts` sets up an Express server with the `StreamableHTTPServerTransport`.
 
+### Go + stdio
+
+```
+my-server/
+├── main.go               # Server entry point
+├── tools.go              # Tool definitions
+├── tools_test.go         # Tests using mcptest
+├── go.mod
+├── Dockerfile
+├── .github/workflows/ci.yml
+└── README.md             # Includes client config snippets
+```
+
 ### Python + stdio
 
 ```
@@ -114,7 +130,7 @@ my-server/
 
 ## Templates
 
-The generated servers use the official [`@modelcontextprotocol/sdk`](https://github.com/modelcontextprotocol/typescript-sdk) for TypeScript and [`mcp`](https://github.com/modelcontextprotocol/python-sdk) for Python. Each template includes:
+The generated servers use the official [`@modelcontextprotocol/sdk`](https://github.com/modelcontextprotocol/typescript-sdk) for TypeScript, [`mcp`](https://github.com/modelcontextprotocol/python-sdk) for Python, and [`mcp-go`](https://github.com/mark3labs/mcp-go) for Go. Each template includes:
 
 - A working `hello` tool as a starting example
 - Proper transport setup (stdio or Streamable HTTP)
@@ -137,6 +153,22 @@ server.tool(
     content: [{ type: 'text', text: `Result: ${input}` }],
   }),
 );
+```
+
+### Go
+
+Edit `tools.go`:
+
+```go
+myTool := mcp.NewTool("my-tool",
+    mcp.WithDescription("Description of what it does"),
+    mcp.WithString("input", mcp.Description("What this input is"), mcp.Required()),
+)
+
+s.AddTool(myTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+    input := request.GetString("input", "")
+    return mcp.NewToolResultText(fmt.Sprintf("Result: %s", input)), nil
+})
 ```
 
 ### Python

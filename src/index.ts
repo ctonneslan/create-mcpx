@@ -2,11 +2,12 @@
 
 import * as p from '@clack/prompts';
 import pc from 'picocolors';
-import { scaffold } from './scaffold.js';
+import { scaffold, dryRun } from './scaffold.js';
 import { Options, Language, Transport, Client } from './types.js';
 import { inferTransport } from './clients.js';
+import { postScaffold } from './post-scaffold.js';
 
-const VALID_LANGUAGES: Language[] = ['typescript', 'python'];
+const VALID_LANGUAGES: Language[] = ['typescript', 'python', 'go'];
 const VALID_TRANSPORTS: Transport[] = ['stdio', 'streamable-http'];
 const VALID_CLIENTS: Client[] = ['claude-desktop', 'cursor', 'vscode', 'windsurf'];
 const VALID_FEATURES = ['tests', 'docker', 'ci'];
@@ -15,6 +16,9 @@ interface Flags extends Partial<Options> {
   name?: string;
   help?: boolean;
   version?: boolean;
+  dryRun?: boolean;
+  install?: boolean;
+  noGit?: boolean;
 }
 
 function parseFlags(argv: string[]): Flags {
@@ -22,6 +26,9 @@ function parseFlags(argv: string[]): Flags {
   let name: string | undefined;
   let help = false;
   let version = false;
+  let isDryRun = false;
+  let install = false;
+  let noGit = false;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -29,6 +36,12 @@ function parseFlags(argv: string[]): Flags {
       help = true;
     } else if (arg === '--version' || arg === '-v') {
       version = true;
+    } else if (arg === '--dry-run') {
+      isDryRun = true;
+    } else if (arg === '--install') {
+      install = true;
+    } else if (arg === '--no-git') {
+      noGit = true;
     } else if (arg.startsWith('--') && i + 1 < argv.length) {
       result[arg.slice(2)] = argv[++i];
     } else if (!arg.startsWith('-')) {
@@ -44,6 +57,9 @@ function parseFlags(argv: string[]): Flags {
     features: result.features?.split(',').filter(Boolean),
     help,
     version,
+    dryRun: isDryRun,
+    install,
+    noGit,
   };
 }
 
@@ -101,25 +117,29 @@ function validateFlags(flags: {
 function printUsage(): void {
   console.log(
     `
-Usage: create-mcp-server [name] [options]
+Usage: create-mcpx [name] [options]
 
 Options:
-  --language <lang>       typescript or python
+  --language <lang>       typescript, python, or go
   --clients <list>        Comma-separated: claude-desktop,cursor,vscode,windsurf
   --transport <transport> stdio or streamable-http (auto-detected from clients if omitted)
   --features <list>       Comma-separated: tests,docker,ci
+  --install               Install dependencies after scaffolding
+  --no-git                Skip git init
+  --dry-run               Preview files without writing anything
   -h, --help              Show this help
   -v, --version           Show version
 
 Examples:
-  create-mcp-server                              # Interactive mode
-  create-mcp-server my-server \\
+  create-mcpx                                    # Interactive mode
+  create-mcpx my-server \\
     --language typescript \\
-    --clients claude-desktop,cursor              # Auto-selects stdio transport
-  create-mcp-server my-server \\
-    --language python \\
-    --transport streamable-http \\
-    --features tests,docker,ci                   # Full non-interactive
+    --clients claude-desktop,cursor               # Auto-selects stdio transport
+  create-mcpx my-server \\
+    --language go --transport stdio \\
+    --features tests,docker --install             # Go server, install deps
+  create-mcpx my-server \\
+    --language python --dry-run                   # Preview without writing
 `.trim(),
   );
 }
@@ -132,7 +152,7 @@ async function main() {
     return;
   }
   if (flags.version) {
-    console.log('create-mcp-server 0.1.0');
+    console.log('create-mcpx 0.1.0');
     return;
   }
 
@@ -150,13 +170,28 @@ async function main() {
       clients,
       features: flags.features ?? [],
     };
+
+    if (flags.dryRun) {
+      const files = dryRun(config);
+      console.log(`Would create ${files.length} files in ${config.name}/:\n`);
+      for (const file of files) {
+        console.log(`  ${file.path}`);
+      }
+      return;
+    }
+
     const outputDir = await scaffold(config);
     console.log(`Created ${config.name} at ${outputDir}`);
+
+    await postScaffold(outputDir, config, {
+      git: !flags.noGit,
+      install: flags.install ?? false,
+    });
     return;
   }
 
   // Interactive mode
-  p.intro(pc.bgCyan(pc.black(' create-mcp-server ')));
+  p.intro(pc.bgCyan(pc.black(' create-mcpx ')));
 
   const projectName = flags.name;
 
@@ -181,6 +216,7 @@ async function main() {
           options: [
             { value: 'typescript', label: 'TypeScript', hint: 'recommended' },
             { value: 'python', label: 'Python' },
+            { value: 'go', label: 'Go' },
           ],
         }),
 
@@ -220,11 +256,17 @@ async function main() {
         p.multiselect({
           message: 'Include extras?',
           options: [
-            { value: 'tests', label: 'Tests', hint: 'vitest or pytest' },
+            { value: 'tests', label: 'Tests', hint: 'vitest, pytest, or go test' },
             { value: 'docker', label: 'Dockerfile' },
             { value: 'ci', label: 'GitHub Actions CI' },
           ],
           required: false,
+        }),
+
+      install: () =>
+        p.confirm({
+          message: 'Install dependencies?',
+          initialValue: false,
         }),
     },
     {
@@ -248,17 +290,33 @@ async function main() {
 
   try {
     const outputDir = await scaffold(config);
-    s.stop('Done!');
+    s.stop('Scaffolded!');
 
-    p.note(
-      [
-        `cd ${config.name}`,
-        config.language === 'typescript' ? 'npm install' : 'pip install -e ".[dev]"',
-        config.language === 'typescript' ? 'npm run dev' : 'python -m src.server',
-      ].join('\n'),
-      'Next steps',
-    );
+    await postScaffold(outputDir, config, {
+      git: !flags.noGit,
+      install: options.install as boolean,
+      spinner: s,
+    });
 
+    const installCmd =
+      config.language === 'typescript'
+        ? 'npm install'
+        : config.language === 'python'
+          ? 'pip install -e ".[dev]"'
+          : 'go mod download';
+
+    const runCmd =
+      config.language === 'typescript'
+        ? 'npm run dev'
+        : config.language === 'python'
+          ? 'python -m src.server'
+          : 'go run .';
+
+    const steps = [`cd ${config.name}`];
+    if (!options.install) steps.push(installCmd);
+    steps.push(runCmd);
+
+    p.note(steps.join('\n'), 'Next steps');
     p.outro(pc.green(`Your MCP server is ready at ${pc.bold(outputDir)}`));
   } catch (err) {
     s.stop('Failed!');

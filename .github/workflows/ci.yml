@@ -22,7 +22,7 @@ jobs:
       - run: npm run build
       - run: npm test
 
-  # Verify generated TypeScript projects actually compile and pass tests
+  # Verify generated projects actually compile and pass tests
   integration:
     runs-on: ubuntu-latest
     steps:
@@ -31,6 +31,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
       - run: npm ci
       - run: npm run build
 
@@ -65,3 +68,19 @@ jobs:
           test -f test-py-stdio/tests/test_tools.py
           test -f test-py-stdio/Dockerfile
           test -f test-py-stdio/.github/workflows/ci.yml
+
+      # Test: Go + stdio + tests
+      - name: Generate Go stdio project
+        run: node dist/index.js test-go-stdio --language go --clients claude-desktop --features tests,docker --no-git
+      - name: Build and test generated Go project
+        working-directory: test-go-stdio
+        run: |
+          go mod tidy
+          go build ./...
+          go test ./...
+
+      # Test: dry-run mode
+      - name: Verify dry-run creates no files
+        run: |
+          node dist/index.js dry-run-test --language typescript --dry-run
+          test ! -d dry-run-test

@@ -1,17 +1,17 @@
 {
-  "name": "create-mcp-server",
+  "name": "create-mcpx",
   "version": "0.1.0",
-  "description": "Scaffold a new MCP server project in seconds. Pick your language, transport, and go.",
+  "description": "Scaffold a new MCP server project in seconds. Pick your language, target clients, and go.",
   "type": "module",
   "bin": {
-    "create-mcp-server": "dist/index.js"
+    "create-mcpx": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "vitest run",
     "start": "node dist/index.js",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm test && npm run build"
   },
   "keywords": [
     "mcp",
@@ -22,13 +22,21 @@
     "ai",
     "llm",
     "claude",
-    "create"
+    "cursor",
+    "vscode",
+    "windsurf",
+    "create",
+    "server"
   ],
   "author": "Charlie Tonneslan",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ctonneslan/create-mcp-server.git"
+  },
+  "homepage": "https://github.com/ctonneslan/create-mcp-server#readme",
+  "bugs": {
+    "url": "https://github.com/ctonneslan/create-mcp-server/issues"
   },
   "dependencies": {
     "@clack/prompts": "^0.11.0",
@@ -43,7 +51,6 @@
     "node": ">=18"
   },
   "files": [
-    "dist",
-    "templates"
+    "dist"
   ]
 }

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { scaffold } from '../scaffold.js';
+import { scaffold, dryRun } from '../scaffold.js';
 import { Options } from '../types.js';
 
 let tmpDir: string;
@@ -467,6 +467,173 @@ describe('scaffold', () => {
       const readme = await fs.readFile(path.join(tmpDir, 'with-tests', 'README.md'), 'utf-8');
 
       expect(readme).toContain('npm test');
+    });
+  });
+
+  describe('go + stdio', () => {
+    const o = opts({
+      name: 'go-server',
+      language: 'go',
+      features: ['tests', 'docker', 'ci'],
+    });
+
+    it('creates expected files', async () => {
+      await scaffold(o);
+      const files = await listFiles(path.join(tmpDir, 'go-server'));
+
+      expect(files).toContain('go.mod');
+      expect(files).toContain('main.go');
+      expect(files).toContain('tools.go');
+      expect(files).toContain('tools_test.go');
+      expect(files).toContain('Dockerfile');
+      expect(files).toContain('.github/workflows/ci.yml');
+      expect(files).toContain('.gitignore');
+      expect(files).toContain('README.md');
+    });
+
+    it('generates valid go.mod', async () => {
+      await scaffold(o);
+      const gomod = await fs.readFile(
+        path.join(tmpDir, 'go-server', 'go.mod'),
+        'utf-8',
+      );
+
+      expect(gomod).toContain('module go-server');
+      expect(gomod).toContain('github.com/mark3labs/mcp-go');
+    });
+
+    it('uses stdio transport in main.go', async () => {
+      await scaffold(o);
+      const main = await fs.readFile(
+        path.join(tmpDir, 'go-server', 'main.go'),
+        'utf-8',
+      );
+
+      expect(main).toContain('ServeStdio');
+      expect(main).not.toContain('StreamableHTTPServer');
+    });
+
+    it('uses mcp-go SDK patterns in tools', async () => {
+      await scaffold(o);
+      const tools = await fs.readFile(
+        path.join(tmpDir, 'go-server', 'tools.go'),
+        'utf-8',
+      );
+
+      expect(tools).toContain('mcp.NewTool');
+      expect(tools).toContain('mcp.WithDescription');
+      expect(tools).toContain('mcp.NewToolResultText');
+    });
+
+    it('uses mcptest package in tests', async () => {
+      await scaffold(o);
+      const test = await fs.readFile(
+        path.join(tmpDir, 'go-server', 'tools_test.go'),
+        'utf-8',
+      );
+
+      expect(test).toContain('mcptest');
+      expect(test).toContain('TestListTools');
+      expect(test).toContain('TestHelloTool');
+    });
+
+    it('generates multi-stage Dockerfile', async () => {
+      await scaffold(o);
+      const dockerfile = await fs.readFile(
+        path.join(tmpDir, 'go-server', 'Dockerfile'),
+        'utf-8',
+      );
+
+      expect(dockerfile).toContain('golang:1.23-alpine AS builder');
+      expect(dockerfile).toContain('CGO_ENABLED=0');
+      expect(dockerfile).toContain('alpine:3.21');
+      expect(dockerfile).not.toContain('EXPOSE');
+    });
+  });
+
+  describe('go + streamable-http', () => {
+    it('uses StreamableHTTPServer', async () => {
+      await scaffold(opts({
+        name: 'go-http',
+        language: 'go',
+        transport: 'streamable-http',
+      }));
+      const main = await fs.readFile(
+        path.join(tmpDir, 'go-http', 'main.go'),
+        'utf-8',
+      );
+
+      expect(main).toContain('StreamableHTTPServer');
+      expect(main).toContain(':3000');
+    });
+
+    it('exposes port in Dockerfile', async () => {
+      await scaffold(opts({
+        name: 'go-http-docker',
+        language: 'go',
+        transport: 'streamable-http',
+        features: ['docker'],
+      }));
+      const dockerfile = await fs.readFile(
+        path.join(tmpDir, 'go-http-docker', 'Dockerfile'),
+        'utf-8',
+      );
+
+      expect(dockerfile).toContain('EXPOSE 3000');
+    });
+  });
+
+  describe('go client configs', () => {
+    it('uses go run command in client configs', async () => {
+      await scaffold(opts({
+        name: 'go-cfg',
+        language: 'go',
+        clients: ['claude-desktop'],
+      }));
+      const readme = await fs.readFile(path.join(tmpDir, 'go-cfg', 'README.md'), 'utf-8');
+
+      expect(readme).toContain('"go"');
+      expect(readme).toContain('"run"');
+    });
+  });
+
+  describe('dry run', () => {
+    it('returns file list without writing anything', () => {
+      const files = dryRun(opts({ name: 'preview' }));
+
+      expect(files.length).toBeGreaterThan(0);
+      expect(files.map((f) => f.path)).toContain('package.json');
+      expect(files.map((f) => f.path)).toContain('src/index.ts');
+    });
+
+    it('includes optional files when features selected', () => {
+      const files = dryRun(opts({
+        name: 'preview',
+        features: ['tests', 'docker', 'ci'],
+      }));
+
+      const paths = files.map((f) => f.path);
+      expect(paths).toContain('Dockerfile');
+      expect(paths).toContain('.github/workflows/ci.yml');
+      expect(paths).toContain('src/__tests__/tools.test.ts');
+    });
+
+    it('works for all languages', () => {
+      const tsFiles = dryRun(opts({ name: 'ts', language: 'typescript' }));
+      const pyFiles = dryRun(opts({ name: 'py', language: 'python' }));
+      const goFiles = dryRun(opts({ name: 'go', language: 'go' }));
+
+      expect(tsFiles.map((f) => f.path)).toContain('package.json');
+      expect(pyFiles.map((f) => f.path)).toContain('pyproject.toml');
+      expect(goFiles.map((f) => f.path)).toContain('go.mod');
+    });
+
+    it('does not create any files on disk', async () => {
+      dryRun(opts({ name: 'ghost' }));
+
+      // Directory should not exist
+      const exists = await fs.access(path.join(tmpDir, 'ghost')).then(() => true).catch(() => false);
+      expect(exists).toBe(false);
     });
   });
 

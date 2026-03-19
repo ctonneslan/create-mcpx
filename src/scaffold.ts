@@ -3,10 +3,27 @@ import path from 'node:path';
 import { Options } from './types.js';
 import { generateTypeScript } from './generators/typescript.js';
 import { generatePython } from './generators/python.js';
+import { generateGo } from './generators/go.js';
 
 export interface GeneratedFile {
   path: string;
   content: string;
+}
+
+function generateFiles(options: Options): GeneratedFile[] {
+  switch (options.language) {
+    case 'typescript':
+      return generateTypeScript(options);
+    case 'python':
+      return generatePython(options);
+    case 'go':
+      return generateGo(options);
+  }
+}
+
+/** Preview which files would be created without writing anything. */
+export function dryRun(options: Options): GeneratedFile[] {
+  return generateFiles(options);
 }
 
 export async function scaffold(options: Options): Promise<string> {
@@ -20,10 +37,7 @@ export async function scaffold(options: Options): Promise<string> {
     if (err.code !== 'ENOENT') throw err;
   }
 
-  const files =
-    options.language === 'typescript'
-      ? generateTypeScript(options)
-      : generatePython(options);
+  const files = generateFiles(options);
 
   // Write all files, rolling back on failure
   try {
@@ -40,14 +54,19 @@ export async function scaffold(options: Options): Promise<string> {
 
   // Make entry point executable for stdio servers
   if (options.transport === 'stdio') {
-    const entry =
-      options.language === 'typescript'
-        ? path.join(outputDir, 'src', 'index.ts')
-        : path.join(outputDir, 'src', 'server.py');
-    try {
-      await fs.chmod(entry, 0o755);
-    } catch {
-      // Non-critical, chmod doesn't apply on Windows
+    let entry: string | null = null;
+    if (options.language === 'typescript') {
+      entry = path.join(outputDir, 'src', 'index.ts');
+    } else if (options.language === 'python') {
+      entry = path.join(outputDir, 'src', 'server.py');
+    }
+
+    if (entry) {
+      try {
+        await fs.chmod(entry, 0o755);
+      } catch {
+        // Non-critical, chmod doesn't apply on Windows
+      }
     }
   }
 

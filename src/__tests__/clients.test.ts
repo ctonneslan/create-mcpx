@@ -91,6 +91,22 @@ describe('generateClientConfigs', () => {
     });
   });
 
+  describe('go + stdio', () => {
+    const configs = generateClientConfigs('go-server', 'go', 'stdio');
+
+    it('uses go command', () => {
+      for (const config of configs) {
+        expect(config.snippet).toContain('"go"');
+      }
+    });
+
+    it('uses run . args', () => {
+      for (const config of configs) {
+        expect(config.snippet).toContain('"run"');
+      }
+    });
+  });
+
   describe('streamable-http transport', () => {
     const configs = generateClientConfigs('http-server', 'typescript', 'streamable-http');
 
