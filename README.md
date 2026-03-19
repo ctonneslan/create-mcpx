@@ -6,7 +6,7 @@ Scaffold a new [MCP](https://modelcontextprotocol.io) server project in seconds.
 npx create-mcpx
 ```
 
-![demo](demo.gif?v=2)
+![demo](https://raw.githubusercontent.com/ctonneslan/create-mcpx/main/demo.gif)
 
 Pick your language, target clients, and optional extras. Get a working MCP server with client config snippets, tests, Docker, and CI ready to go.
 
